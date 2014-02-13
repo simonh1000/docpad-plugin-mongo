@@ -28,8 +28,12 @@
   "peerDependencies": {
     "docpad": "6"
   },
-  "main": "./src/mongodbdata.plugin.coffee",
+  "main": "./out/mongodbdata.plugin.js",
   "dependencies": {
     "mongoose": "~3.8.7"
+  },
+  "devDependencies": {
+    "coffee-script": "~1.6.2",
+    "docpad": ">=6.3 <7"
   }
 }
