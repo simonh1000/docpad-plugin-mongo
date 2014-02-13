@@ -1,8 +1,8 @@
 {
-  "name": "docpad-plugin-mongodbdata",
+  "name": "docpad-plugin-mongo",
   "version": "2.0.0",
   "description": "DocPad plugin that adds the ability to render Something to Something Else",
-  "homepage": "https://github.com/simonh1000/docpad-plugin-mongodbdata",
+  "homepage": "https://github.com/simonh1000/docpad-plugin-mongo",
   "keywords": [
     "docpad",
     "docpad-plugin",
@@ -28,7 +28,7 @@
   "peerDependencies": {
     "docpad": "6"
   },
-  "main": "./out/mongodbdata.plugin.js",
+  "main": "./src/mongo.plugin.coffee",
   "dependencies": {
     "mongoose": "~3.8.7"
   },
