@@ -10,7 +10,7 @@ module.exports = (BasePlugin) ->
 		name: 'mongo'
 
 		# Fetch list of Gigs
-		getGigsData: ->
+		getGigsData: (opts) ->
 			mongoose.connect ('mongodb://localhost/test')
 			db = mongoose.connection;
 			db.on 'error', console.error.bind(console, 'connection error:')
@@ -27,6 +27,8 @@ module.exports = (BasePlugin) ->
 					if err then console.error "db error"
 					else 
 						console.dir gigs
+						opts["getGigsData"] = gigs
+						opts.templateData["getGigsData"] = gigs
 						return gigs
 
 		# =========================
@@ -40,4 +42,5 @@ module.exports = (BasePlugin) ->
 			# 	g = { "date" : "3-4-2013", "location" : "Gent" }
 			# 	return g
 
-			opts.templateData["getGigsData"] = @getGigsData()
+			# opts.templateData["getGigsData"] = @getGigsData()
+			@getGigsData(opts)
