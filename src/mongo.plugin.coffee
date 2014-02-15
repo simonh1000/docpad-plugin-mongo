@@ -10,7 +10,10 @@ module.exports = (BasePlugin) ->
 			hostname: 'mongodb://localhost/test'
 
 		# Fetch list of Gigs
+		# opts={} sets opts to default empty object if otherwise null
+		# @ is this
 		getGigsData: (opts={}, next) ->
+			console.log "x2"
 			config = @getConfig()
 			docpad = @docpad
 
@@ -37,8 +40,10 @@ module.exports = (BasePlugin) ->
 
 		extendTemplateData: (opts,next) ->
 			@getGigsData null, (err, gigs) ->
-				return next(err)  if err
+				console.log(gigs)
+				return next(err) if err
 				opts.templateData.gigs = gigs
+				return next()
 
 			# Chain
 			@
