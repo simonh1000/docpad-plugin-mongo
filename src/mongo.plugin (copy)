@@ -3,7 +3,10 @@ mongoose = require('mongoose')
 
 # Export Plugin
 module.exports = (BasePlugin) ->
+
+	# Define Plugin
 	class mongoPlugin extends BasePlugin
+		# Plugin name
 		name: 'mongo'
 
 		config:
@@ -17,12 +20,13 @@ module.exports = (BasePlugin) ->
 			mongoose.connect(config.hostname)
 			db = mongoose.connection
 			db.on 'error', (err) ->
-				docpad.error(err)  # you may want to change this to `return next(err)`
-
+				docpad.error(err)
+				# or return next(err)
+			
 			db.once 'open', -> 
 				gigsSchema = mongoose.Schema {
-					date: String,
-					location: String
+					date : String,
+					location : String
 				}
 
 				Gigs = mongoose.model('Gigs', gigsSchema)
@@ -31,14 +35,17 @@ module.exports = (BasePlugin) ->
 					mongoose.connection.close()
 					return next(err)  if err
 					return next(null, gigs)
+			#Chain
+			@
+
+		# =========================
+		# Events
+
+		# Extend Template Data
+		extendTemplateData: (opts,next) ->
+			@getGigsData null, (err, gigs) ->
+				return next(err) if err
+				opts.templateData.gigs = gigs
 
 			# Chain
 			@
-
-		extendTemplateData: (opts,next) ->
-			@getGigsData null, (err, gigs) ->
-				return next(err)  if err
-				opts.templateData.gigs = gigs
-
-				# Chain
-				#@
