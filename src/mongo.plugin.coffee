@@ -40,5 +40,5 @@ module.exports = (BasePlugin) ->
 				return next(err)  if err
 				opts.templateData.gigs = gigs
 
-				# Chain
-				#@
+			# Chain
+			@
