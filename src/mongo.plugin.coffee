@@ -13,7 +13,6 @@ module.exports = (BasePlugin) ->
 		# opts={} sets opts to default empty object if otherwise null
 		# @ is this
 		getGigsData: (opts={}, next) ->
-			console.log "x2"
 			config = @getConfig()
 			docpad = @docpad
 
