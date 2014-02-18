@@ -3,49 +3,43 @@ mongoose = require('mongoose')
 
 # Export Plugin
 module.exports = (BasePlugin) ->
-
-	# Define Plugin
 	class mongoPlugin extends BasePlugin
-		# Plugin name
 		name: 'mongo'
 
-		config:
-			hostname: 'mongodb://localhost/test'
+		gigsSchema = mongoose.Schema {
+			town: String,
+			date: String,
+			location: String
+		}
 
 		# Fetch list of Gigs
+		# opts={} sets opts to default empty object if otherwise null
+		# @ is this
 		getGigsData: (opts={}, next) ->
 			config = @getConfig()
 			docpad = @docpad
 
-			mongoose.connect(config.hostname)
+			mongoose.connect('mongodb://localhost/'+docpad.mongo.database)
 			db = mongoose.connection
 			db.on 'error', (err) ->
-				docpad.error(err)
-				# or return next(err)
-			
-			db.once 'open', -> 
-				gigsSchema = mongoose.Schema {
-					date : String,
-					location : String
-				}
+				docpad.error(err)  # you may want to change this to `return next(err)`
 
+			db.once 'open', -> 
 				Gigs = mongoose.model('Gigs', gigsSchema)
 
 				Gigs.find {}, (err, gigs) ->
 					mongoose.connection.close()
 					return next(err)  if err
 					return next(null, gigs)
-			#Chain
+
+			# Chain
 			@
 
-		# =========================
-		# Events
-
-		# Extend Template Data
 		extendTemplateData: (opts,next) ->
 			@getGigsData null, (err, gigs) ->
 				return next(err) if err
 				opts.templateData.gigs = gigs
+				return next()
 
 			# Chain
 			@

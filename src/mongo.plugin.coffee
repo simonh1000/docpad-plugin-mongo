@@ -6,42 +6,41 @@ module.exports = (BasePlugin) ->
 	class mongoPlugin extends BasePlugin
 		name: 'mongo'
 
-		config:
-			hostname: 'mongodb://localhost/test'
+		dbSchema = new mongoose.Schema docpad.config.mongo.schema, { collection: docpad.config.mongo.collection }
 
 		# Fetch list of Gigs
 		# opts={} sets opts to default empty object if otherwise null
 		# @ is this
-		getGigsData: (opts={}, next) ->
+		getDbData: (opts={}, next) ->
 			config = @getConfig()
+			# console.log('config: '+config)
 			docpad = @docpad
 
-			mongoose.connect(config.hostname)
+			uristring = 
+				process.env.MONGOLAB_URI || 
+				process.env.MONGOHQ_URL || 
+				'mongodb://localhost/app22118608';
+			
+			mongoose.connect(uristring)
 			db = mongoose.connection
 			db.on 'error', (err) ->
 				docpad.error(err)  # you may want to change this to `return next(err)`
 
 			db.once 'open', -> 
-				gigsSchema = mongoose.Schema {
-					date: String,
-					location: String
-				}
+				dbData = mongoose.model('dbData', dbSchema)
 
-				Gigs = mongoose.model('Gigs', gigsSchema)
-
-				Gigs.find {}, (err, gigs) ->
+				dbData.find {}, (err, data) ->
 					mongoose.connection.close()
-					return next(err)  if err
-					return next(null, gigs)
+					return next(err) if err
+					return next(null, data)
 
 			# Chain
 			@
 
 		extendTemplateData: (opts,next) ->
-			@getGigsData null, (err, gigs) ->
-				console.log(gigs)
+			@getDbData null, (err, data) ->
 				return next(err) if err
-				opts.templateData.gigs = gigs
+				opts.templateData[docpad.config.mongo.collection] = data
 				return next()
 
 			# Chain
