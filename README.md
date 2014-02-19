@@ -10,12 +10,13 @@ Add to `docpad.coffee`
 			hostname: 'mongodb://<name>:<password>@troup.mongohq.com:10044/',
 			database: '<dbName>',
 			collection: '<collectionName>',
-			schema: {
-				# e.g. 
-				# town: String,
-				# date: String,
-				# location: String
-			}
+			schema:
+				town: String,
+				date: String,
+				location: String
+			query:
+				collection: 'gigs',
+				predicate: {"date": {$gt: new Date()}}
 	}
 
 	# Export the DocPad Configuration
