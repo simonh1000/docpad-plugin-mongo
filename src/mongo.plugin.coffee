@@ -1,14 +1,14 @@
 #prepare
 mongoose = require('mongoose')
+Schema = mongoose.Schema
 
 # Export Plugin
 module.exports = (BasePlugin) ->
 	class mongoPlugin extends BasePlugin
 		name: 'mongo'
 
-
 		config:
-			uristring= process.env.MONGOLAB_URI || 
+			uristring: () -> process.env.MONGOLAB_URI || 
 				process.env.MONGOHQ_URL || 
 				'mongodb://localhost/app22118608'
 
@@ -30,10 +30,11 @@ module.exports = (BasePlugin) ->
 			db.on 'error', (err) ->
 				docpad.error(err)  # you may want to change this to `return next(err)`
 
-			db.once 'open', -> 
-				Dbdata = mongoose.model 'Dbdata', docpad.schema
-
-				# cond = {"date": {$gt: new Date()}}
+			db.once 'open', ->
+				# Take client's schema and add _id field
+				schema = docpad.schema
+				schema["_id"] = Schema.Types.ObjectId
+				Dbdata = mongoose.model 'Dbdata', schema
 
 				Dbdata.find docpad.config.mongo.query.predicate, (err, data) ->
 					mongoose.connection.close()
@@ -45,7 +46,7 @@ module.exports = (BasePlugin) ->
 
 		replaceDbData: (opts) ->
 			config = @getConfig()
-			{data} = opts
+			{data, cb} = opts
 
 			mongoose.connect(uristring)
 			
@@ -54,22 +55,38 @@ module.exports = (BasePlugin) ->
 			db.on 'error', (err) ->
 				docpad.error(err)  # you may want to change this to `return next(err)`
 
-			db.once 'open', -> 
-				Dbdata = mongoose.model 'Dbdata', docpad.schema
-				console.log "Adding to database "
-				`for (var index in data) {
-					gig = new Dbdata(data[index]);
-					gig.save(function(err, gig){
-						if (err) console.log("db save error"+err);
-					});
-				}`
-				mongoose.connection.close()			
+			db.once 'open', ->
+				# Take client's schema and add _id field
+				schema = docpad.schema
+				Dbdata = mongoose.model 'Dbdata', schema
+
+				console.log "Adding to database"
+				
+				# http://metaduck.com/01-asynchronous-iteration-patterns.html
+				inserted = 0
+
+				for index, item of data
+					toUpdate = new Dbdata item
+					toUpdate.save (err, itemEntered) ->			
+						if err 
+							mongoose.connection.close()
+							cb "failed" 
+							return
+						if (++inserted == data.length)
+							mongoose.connection.close()
+							cb "success"
+							return
+				@				
 
 		extendTemplateData: (opts,next) ->
 			docpad = @docpad
 			# config = @getConfig()
 			
-			docpad.schema = new mongoose.Schema docpad.config.mongo.schema, { collection: docpad.config.mongo.query.collection }
+			# create schema, tied to relevant collection, to be used to create model
+			cSchema = docpad.config.mongo.customSchema
+			cSchema["_id"] = Schema.Types.ObjectId
+
+			docpad.schema = new mongoose.Schema cSchema, { collection: docpad.config.mongo.query.collection }
 
 			@getDbData null, (err, data) ->
 				return next(err) if err
@@ -78,7 +95,6 @@ module.exports = (BasePlugin) ->
 
 			# Chain
 			@
-
 
 		serverExtend: (opts) ->
 			{server, express} = opts
@@ -90,9 +106,10 @@ module.exports = (BasePlugin) ->
 			# 	res.setHeader 'Content-Type', 'text/plain'
 			# 	res.end body
 
-			server.post '/hello.txt', (req, res) ->
+			server.post '/newdata', (req, res) ->
 				console.log 'Received data entries'
-				plugin.replaceDbData { data:req.body }
-				body = "Hello World Simon"
-				res.setHeader 'Content-Type', 'text/plain'
-				res.end body
+				plugin.replaceDbData { data:req.body, cb : (msg) ->
+					console.log("callback msg="+msg)
+					res.setHeader 'Content-Type', 'text/plain'
+					res.end msg
+				}
