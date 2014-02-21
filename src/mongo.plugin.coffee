@@ -5,36 +5,43 @@ Schema = mongoose.Schema
 # Export Plugin
 module.exports = (BasePlugin) ->
 	class mongoPlugin extends BasePlugin
+		Dbdata = {}
+
 		name: 'mongo'
 
 		config:
-			uristring: () -> process.env.MONGOLAB_URI || 
+			uristring: (() -> process.env.MONGOLAB_URI || 
 				process.env.MONGOHQ_URL || 
-				'mongodb://localhost/app22118608'
+				'mongodb://localhost/app22118608')()
+			customSchema:
+				_id: Schema.Types.ObjectId,
+				town: String,
+				date: { type: Date, default: Date.now },
+				location: String,
+				link: String
+			schema: new mongoose.Schema docpad.config.mongo.customSchema, { collection: docpad.config.mongo.query.collection }
 
-		uristring= 
-			process.env.MONGOLAB_URI || 
-			process.env.MONGOHQ_URL || 
-			'mongodb://localhost/app22118608'
+		# uristring= 
+		# 	process.env.MONGOLAB_URI || 
+		# 	process.env.MONGOHQ_URL || 
+		# 	'mongodb://localhost/app22118608'
 			
-		# Fetch list of Gigs
+		# Reading data
+		# ============
 		# opts={} sets opts to default empty object if otherwise null
-		# @ is this
 		getDbData: (opts={}, next) ->
 			config = @getConfig()
 			
-			mongoose.connect(uristring)
-			
+			mongoose.connect(config.uristring)			
 			db = mongoose.connection
 
 			db.on 'error', (err) ->
 				docpad.error(err)  # you may want to change this to `return next(err)`
 
-			db.once 'open', ->
-				# Take client's schema and add _id field
-				schema = docpad.schema
-				schema["_id"] = Schema.Types.ObjectId
-				Dbdata = mongoose.model 'Dbdata', schema
+			# schema = new mongoose.Schema config.customSchema, { collection: docpad.config.mongo.query.collection }
+
+			db.once 'open', -> 
+				Dbdata = mongoose.model 'Dbdata', config.schema
 
 				Dbdata.find docpad.config.mongo.query.predicate, (err, data) ->
 					mongoose.connection.close()
@@ -44,49 +51,11 @@ module.exports = (BasePlugin) ->
 			# Chain
 			@
 
-		replaceDbData: (opts) ->
-			config = @getConfig()
-			{data, cb} = opts
-
-			mongoose.connect(uristring)
-			
-			db = mongoose.connection
-			
-			db.on 'error', (err) ->
-				docpad.error(err)  # you may want to change this to `return next(err)`
-
-			db.once 'open', ->
-				# Take client's schema and add _id field
-				schema = docpad.schema
-				Dbdata = mongoose.model 'Dbdata', schema
-
-				console.log "Adding to database"
-				
-				# http://metaduck.com/01-asynchronous-iteration-patterns.html
-				inserted = 0
-
-				for index, item of data
-					toUpdate = new Dbdata item
-					toUpdate.save (err, itemEntered) ->			
-						if err 
-							mongoose.connection.close()
-							cb "failed" 
-							return
-						if (++inserted == data.length)
-							mongoose.connection.close()
-							cb "success"
-							return
-				@				
-
 		extendTemplateData: (opts,next) ->
 			docpad = @docpad
 			# config = @getConfig()
 			
-			# create schema, tied to relevant collection, to be used to create model
-			cSchema = docpad.config.mongo.customSchema
-			cSchema["_id"] = Schema.Types.ObjectId
-
-			docpad.schema = new mongoose.Schema cSchema, { collection: docpad.config.mongo.query.collection }
+			docpad.schema = new mongoose.Schema docpad.config.mongo.schema, { collection: docpad.config.mongo.query.collection }
 
 			@getDbData null, (err, data) ->
 				return next(err) if err
@@ -96,15 +65,52 @@ module.exports = (BasePlugin) ->
 			# Chain
 			@
 
+		# Data updating
+		# =============	
+		replaceDbData: (opts) ->
+			config = @getConfig()
+			{data, cb} = opts
+
+			mongoose.connect(config.uristring)			
+			db = mongoose.connection
+			
+			db.on 'error', (err) ->
+				docpad.error(err)
+
+			# schema = new mongoose.Schema config.customSchema, { collection: docpad.config.mongo.query.collection }
+
+			db.once 'open', ->
+				# Dbdata = mongoose.model 'Dbdata', schema
+				console.log "Adding to database"
+				
+				# http://metaduck.com/01-asynchronous-iteration-patterns.html
+				# http://stackoverflow.com/a/7855281/1923190
+				inserted = 0
+				report = ""
+
+				for index, item of data
+					toUpdate = new Dbdata item
+					upsertData = toUpdate.toObject()
+					delete upsertData._id
+
+					Dbdata.update {_id:toUpdate._id}, upsertData, {upsert:true}, (err) ->			
+						if err 
+							# mongoose.connection.close()
+							console.log err
+							report += inserted+" failed\n" 
+							return
+						else report += inserted+" succeeded\n" 
+
+						if (++inserted == Object.keys(data).length)
+							console.log("All done, closing connection"+report)
+							mongoose.connection.close()
+							cb report
+							return
+				@				
+
 		serverExtend: (opts) ->
 			{server, express} = opts
 			plugin = @
-
-			# server.get '/hello.txt', (req, res) ->
-			# 	console.log('Get request received: '+req.query)
-			# 	body = "Hello World Simon"
-			# 	res.setHeader 'Content-Type', 'text/plain'
-			# 	res.end body
 
 			server.post '/newdata', (req, res) ->
 				console.log 'Received data entries'
