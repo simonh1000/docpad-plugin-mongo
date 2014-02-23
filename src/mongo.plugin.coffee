@@ -107,53 +107,58 @@ module.exports = (BasePlugin) ->
 
 			db.once 'open', ->
 				# Dbdata = mongoose.model 'Dbdata', schema
-				console.log "Removing from database"
+				# console.log "Removing from database"
 				toRemove = new Dbdata data
 				toRemove.remove (err, product) ->
 					mongoose.connection.close()
-					response = if err then err else false
-					cb response
+					# response = if err then err else false
+					cb err
 
 		serverExtend: (opts) ->
-			{server, express} = opts
+			{server, serverExpress} = opts
 			plugin = @
 			docpad = @docpad
 
-			server.post '/newdata', (req, res) ->
+			server.post '/newdata', (req, res, next) ->
 				console.log 'Received data entries'
-				plugin.replaceDbData { data:req.body, cb : (msg) ->
-					# console.log ("replaceDbData callback msg="+msg)
-					res.setHeader 'Content-Type', 'text/plain'
-					res.end msg
-
-					renderOpts =
-						path: '/src/index.html.eco',
-						renderSingleExtensions:true
-
-					docpad.action 'generate', reset: true, (err,result) ->
-						if err then console.log "regen error "+err
-
-					# docpadInstanceConfiguration = {}
-					# docpadInstance = require('docpad').createInstance( docpadInstanceConfiguration, (err,docpadInstance) -> 
-					# 	console.log "docpad instance creation "+err
-					# )
-					
-					# docpadInstance.action 'generate', (err,result) ->
-					# 	console.log "generate after update complete "+err					
-				}
-
-			server.get '/remove', (req, res) ->
-				console.log 'Processing removal of'+req.query._id
-				plugin.removeData { data:req.query, cb : (err) ->
-					console.log ("removal error="+err)
-					res.setHeader 'Content-Type', 'text/plain'
-					res.end err
-
-					if (!err) 
-						# renderOpts =
-						# 	path: '/src/*.eco',
-						# 	renderSingleExtensions:true
-
+				plugin.replaceDbData { data:req.body, cb : (err) ->
+					# res.setHeader 'Content-Type', 'text/plain'
+					if (err)
+						console.log ("Database update error="+err)
+						res.end err
+					else 
+						console.log "Database update success"
 						docpad.action 'generate', reset: true, (err,result) ->
-							console.log "generate after removal: "+err+" x "+result
+						# docpad.action 'generate', {collection:docpad.getCollection("database")}, (err,result) ->
+							if err
+								console.log "regeneration failed"
+								res.send(500, err?.message or err)
+								return next(err) 
+							else
+								console.log "regeneration success"
+								# res.send(200, 'regeneration succeeded')
+								return next()
 				}
+
+			server.get '/remove', (req, res, next) ->
+				console.log 'Processing removal of '+req.query._id
+				plugin.removeData { data:req.query, cb : (err) ->
+					# res.setHeader 'Content-Type', 'text/plain'
+					if (err)
+						console.log ("removal error="+err)
+						res.send(500, err?.message or err)
+					else 
+						console.log "Database removal succeeded"
+						docpad.action 'generate', reset: true, (err,result) ->
+						# docpad.action 'generate', {collection:docpad.getCollection("database")}, (err,result) ->
+							if err
+								console.log "regeneration failed"
+								res.send(500, err?.message or err)
+								return next(err) 
+							else
+								console.log "regeneration success"
+								# res.send(200, 'regeneration succeeded')
+								return next()
+				}
+			# chain??
+			@
