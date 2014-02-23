@@ -7,16 +7,22 @@ Add to `docpad.coffee`
 	docpadConfig = {
 
 		mongo:
-			hostname: 'mongodb://<name>:<password>@troup.mongohq.com:10044/',
-			database: '<dbName>',
-			collection: '<collectionName>',
-			schema:
+			hostname: 'mongodb://...:...@troup.mongohq.com:10044/'
+			# hostname: 'mongodb://localhost/'
+			user: ...
+			pass: ...
+			database: 'app22118608'		
+			collection: 'gigs',
+			customSchema:
 				town: String,
-				date: String,
-				location: String
-			query:
-				collection: 'gigs',
-				predicate: {"date": {$gt: new Date()}}
+				date: { type: Date, default: Date.now },
+				location: String,
+				link: String		
+			queries:
+				futuregigs:
+					predicate: {"date": {$gte: new Date()}}
+				pastgigs:
+					predicate: {"date": {$lt: new Date()}}
 	}
 
 	# Export the DocPad Configuration

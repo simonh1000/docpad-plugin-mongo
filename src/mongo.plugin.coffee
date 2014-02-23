@@ -1,11 +1,11 @@
 #prepare
 mongoose = require('mongoose')
 Schema = mongoose.Schema
-
-schemaObj = docpad.config.mongo.customSchema
+# config = @getConfig()
+schemaObj = docpad.config.plugins.mongo.customSchema
 schemaObj._id = {type: Schema.Types.ObjectId, index:true}
 
-gigSchema = new Schema schemaObj, { collection: docpad.config.mongo.query.collection }
+gigSchema = new Schema schemaObj, { collection: docpad.config.plugins.mongo.collection }
 
 Dbdata = mongoose.model 'gigs', gigSchema
 
@@ -19,22 +19,12 @@ module.exports = (BasePlugin) ->
 				process.env.MONGOHQ_URL || 
 				'mongodb://localhost/app22118608')()
 
-
-			# schema: ( () ->
-			# 	customSchema = docpad.config.mongo.customSchema
-			# 	customSchema._id = {type: Schema.Types.ObjectId, index:true}
-			# 	return new mongoose.Schema customSchema, { collection: docpad.config.mongo.query.collection })()
-			
-		# Dbdata = mongoose.model 'Dbdata', mongoPlugin.prototype.config.schema
-
 		# Reading data
 		# ============
 		# opts={} sets opts to default empty object if otherwise null
-		getDbData: (opts={}, next) ->
+		extendTemplateData: (opts,next) ->
+			# load global and local config data for THIS plugin
 			config = @getConfig()
-
-			# Dbdata = mongoose.model 'gigs', gigSchema
-			# Dbdata = new gigModel()
 			
 			mongoose.connect(config.uristring)			
 			db = mongoose.connection
@@ -42,22 +32,23 @@ module.exports = (BasePlugin) ->
 			db.on 'error', (err) ->
 				docpad.error(err)  # you may want to change this to `return next(err)`
 
-			db.once 'open', -> 
-				Dbdata.find docpad.config.mongo.query.predicate, (err, data) ->
-					mongoose.connection.close()
-					return next(err) if err
-					return next(null, data)
-			# Chain
-			@
+			db.once 'open', ->
+				queries = config.queries
+				queryCount = 0
+				totalQueries = Object.keys(queries).length
 
-		extendTemplateData: (opts,next) ->
-			docpad = @docpad
-			
-			@getDbData null, (err, data) ->
-				return next(err) if err
-				opts.templateData[docpad.config.mongo.query.collection] = data
-				return next()
-
+				for index, query of queries
+					# could check for ownProperty here
+					# Listing 5.18 Javascript Ninja
+					((indexClosure) ->
+						Dbdata.find query.predicate, (err, data) ->
+							opts.templateData[indexClosure] = data
+					
+							if (++queryCount == totalQueries)
+								mongoose.connection.close()
+								return next(err) if err
+								return next(null, data)
+					)(index)
 			# Chain
 			@
 
@@ -139,16 +130,16 @@ module.exports = (BasePlugin) ->
 						path: '/src/index.html.eco',
 						renderSingleExtensions:true
 
-					# docpad.action 'render', renderOpts, (err,result) ->
-					# 	if err then console.log "regen error "+err
+					docpad.action 'generate', reset: true, (err,result) ->
+						if err then console.log "regen error "+err
 
-					docpadInstanceConfiguration = {}
-					docpadInstance = require('docpad').createInstance( docpadInstanceConfiguration, (err,docpadInstance) -> 
-						console.log "docpad instance creation "+err
-					)
+					# docpadInstanceConfiguration = {}
+					# docpadInstance = require('docpad').createInstance( docpadInstanceConfiguration, (err,docpadInstance) -> 
+					# 	console.log "docpad instance creation "+err
+					# )
 					
-					docpadInstance.action 'render', renderOpts, (err,result) ->
-						console.log "Rendering after update complete "+err					
+					# docpadInstance.action 'generate', (err,result) ->
+					# 	console.log "generate after update complete "+err					
 				}
 
 			server.get '/remove', (req, res) ->
@@ -159,10 +150,10 @@ module.exports = (BasePlugin) ->
 					res.end err
 
 					if (!err) 
-						renderOpts =
-							path: '/src/*.eco',
-							renderSingleExtensions:true
+						# renderOpts =
+						# 	path: '/src/*.eco',
+						# 	renderSingleExtensions:true
 
-						docpad.action 'render', renderOpts, (err,result) ->
-							console.log "regen following deletion "+err+" x "+result
+						docpad.action 'generate', reset: true, (err,result) ->
+							console.log "generate after removal: "+err+" x "+result
 				}
