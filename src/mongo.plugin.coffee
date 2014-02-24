@@ -19,6 +19,9 @@ module.exports = (BasePlugin) ->
 				process.env.MONGOHQ_URL || 
 				'mongodb://localhost/app22118608')()
 
+		# extendCollections: (next) ->
+		# 	test = @getCollection("html").findAllLive({isPage:true}, {menuOrder:1})
+
 		# Reading data
 		# ============
 		# opts={} sets opts to default empty object if otherwise null
@@ -33,6 +36,7 @@ module.exports = (BasePlugin) ->
 				docpad.error(err)  # you may want to change this to `return next(err)`
 
 			db.once 'open', ->
+				console.log "/extendTemplateData: reading from database"
 				queries = config.queries
 				queryCount = 0
 				totalQueries = Object.keys(queries).length
@@ -83,10 +87,8 @@ module.exports = (BasePlugin) ->
 
 					Dbdata.update {_id: id}, upsertData, {upsert:true}, (err) ->			
 						if err 
-							console.log "plugin: "+err
-							report += inserted+" failed"+err+"\n" 
-							return
-						else report += inserted+" succeeded\n"
+							console.log "DB update error: "+err
+							report += inserted+" failed"+err+"\n"
 
 						if (++inserted == Object.keys(data).length)
 							console.log("All done, closing connection"+report)
@@ -115,7 +117,7 @@ module.exports = (BasePlugin) ->
 					cb err
 
 		serverExtend: (opts) ->
-			{server, serverExpress} = opts
+			{server, serverExpress, express} = opts
 			plugin = @
 			docpad = @docpad
 
@@ -131,13 +133,13 @@ module.exports = (BasePlugin) ->
 						docpad.action 'generate', reset: true, (err,result) ->
 						# docpad.action 'generate', {collection:docpad.getCollection("database")}, (err,result) ->
 							if err
-								console.log "regeneration failed"
+								console.log "/update regeneration failed"
 								res.send(500, err?.message or err)
-								return next(err) 
+								next(err) 
 							else
-								console.log "regeneration success"
-								# res.send(200, 'regeneration succeeded')
-								return next()
+								console.log "/update regeneration success"
+								res.send(200, '/update success')
+								# next()
 				}
 
 			server.get '/remove', (req, res, next) ->
@@ -147,18 +149,34 @@ module.exports = (BasePlugin) ->
 					if (err)
 						console.log ("removal error="+err)
 						res.send(500, err?.message or err)
+						next(err)
 					else 
-						console.log "Database removal succeeded"
+						console.log "/remove: Database action succeeded"
 						docpad.action 'generate', reset: true, (err,result) ->
 						# docpad.action 'generate', {collection:docpad.getCollection("database")}, (err,result) ->
 							if err
-								console.log "regeneration failed"
+								console.log "/remove: regeneration failed"+err
 								res.send(500, err?.message or err)
+								res.body err
 								return next(err) 
 							else
-								console.log "regeneration success"
-								# res.send(200, 'regeneration succeeded')
-								return next()
+								console.log "/remove: regeneration success"
+								# console.log 'content-type %s', res.get 'Content-Type'
+								# 200 is success code
+								res.end 'regeneration succeeded'
+								
+								# res.end false
+								# http://stackoverflow.com/a/7789131/1923190 suggests NOT calling next() as I have initiated the body
+								# and next() will invoke other functions that try to set headers
+								# BUT the false is never actually sent to the client!
+								# next()						
+					@
 				}
+
+			server.get '/test', (req, res, next) ->
+				console.log '/test '
+				res.send(200, '/test: success')
+				# res.end
+
 			# chain??
-			@
+			# @
