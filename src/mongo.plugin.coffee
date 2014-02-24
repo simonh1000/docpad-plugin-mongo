@@ -20,7 +20,7 @@ module.exports = (BasePlugin) ->
 				'mongodb://localhost/app22118608')()
 
 		# extendCollections: (next) ->
-		# 	test = @getCollection("html").findAllLive({isPage:true}, {menuOrder:1})
+		# 	test = docpad.getCollections("html").findAll({isPage:true}, {menuOrder:1})
 
 		# Reading data
 		# ============
@@ -115,6 +115,8 @@ module.exports = (BasePlugin) ->
 					mongoose.connection.close()
 					# response = if err then err else false
 					cb err
+					return next()
+			@
 
 		serverExtend: (opts) ->
 			{server, serverExpress, express} = opts
@@ -175,7 +177,17 @@ module.exports = (BasePlugin) ->
 
 			server.get '/test', (req, res, next) ->
 				console.log '/test '
-				res.send(200, '/test: success')
+				docpad.action 'generate', {}, (err,result) ->
+				# docpad.action 'generate server', {collection:docpad.getCollection("database")}, (err,result) ->
+					if err
+						console.log "/test: error"
+						res.send 200, '/test: error'+err
+						# return next(err)
+					else
+						console.log "/test: success"
+						# console.log 'content-type %s', res.get 'Content-Type'
+						# 200 is success code
+						res.end 'regeneration succeeded'
 				# res.end
 
 			# chain??
