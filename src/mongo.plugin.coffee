@@ -24,10 +24,29 @@ module.exports = (BasePlugin) ->
 
 		# Reading data
 		# ============
+
+		readData: (obj, queries, next) ->
+			queryCount = 0
+			totalQueries = Object.keys(queries).length
+
+			for index, query of queries
+				# could check for ownProperty here
+				# Listing 5.18 Javascript Ninja
+				((indexClosure) ->
+					Dbdata.find query.predicate, (err, data) ->
+						obj[indexClosure] = data
+				
+						if (++queryCount == totalQueries)
+							mongoose.connection.close()
+							return next(err) if err
+							return next()
+				)(index)
+
 		# opts={} sets opts to default empty object if otherwise null
 		extendTemplateData: (opts,next) ->
 			# load global and local config data for THIS plugin
 			config = @getConfig()
+			plugin = @
 			
 			mongoose.connect(config.uristring)			
 			db = mongoose.connection
@@ -37,22 +56,7 @@ module.exports = (BasePlugin) ->
 
 			db.once 'open', ->
 				console.log "/extendTemplateData: reading from database"
-				queries = config.queries
-				queryCount = 0
-				totalQueries = Object.keys(queries).length
-
-				for index, query of queries
-					# could check for ownProperty here
-					# Listing 5.18 Javascript Ninja
-					((indexClosure) ->
-						Dbdata.find query.predicate, (err, data) ->
-							opts.templateData[indexClosure] = data
-					
-							if (++queryCount == totalQueries)
-								mongoose.connection.close()
-								return next(err) if err
-								return next(null, data)
-					)(index)
+				plugin.readData opts.templateData, config.queries, next
 			# Chain
 			@
 
@@ -122,8 +126,9 @@ module.exports = (BasePlugin) ->
 			{server, serverExpress, express} = opts
 			plugin = @
 			docpad = @docpad
+			config = @getConfig()
 
-			server.post '/newdata', (req, res, next) ->
+			server.post '/newdata', (req, res) ->
 				console.log 'Received data entries'
 				plugin.replaceDbData { data:req.body, cb : (err) ->
 					# res.setHeader 'Content-Type', 'text/plain'
@@ -144,51 +149,56 @@ module.exports = (BasePlugin) ->
 								# next()
 				}
 
-			server.get '/remove', (req, res, next) ->
+			server.get '/remove', (req, res) ->
 				console.log 'Processing removal of '+req.query._id
 				plugin.removeData { data:req.query, cb : (err) ->
 					# res.setHeader 'Content-Type', 'text/plain'
 					if (err)
 						console.log ("removal error="+err)
 						res.send(500, err?.message or err)
-						next(err)
+						# next(err)
 					else 
 						console.log "/remove: Database action succeeded"
-						docpad.action 'generate', reset: true, (err,result) ->
+						plugin.readData docpad.pluginsTemplateData, config.queries, () ->
+							docpad.action 'generate', reset: true, (err,result) ->
+								console.log "error" if err
+							# return next(null, result)	
 						# docpad.action 'generate', {collection:docpad.getCollection("database")}, (err,result) ->
-							if err
-								console.log "/remove: regeneration failed"+err
-								res.send(500, err?.message or err)
-								res.body err
-								return next(err) 
-							else
-								console.log "/remove: regeneration success"
-								# console.log 'content-type %s', res.get 'Content-Type'
-								# 200 is success code
-								res.end 'regeneration succeeded'
-								
-								# res.end false
-								# http://stackoverflow.com/a/7789131/1923190 suggests NOT calling next() as I have initiated the body
-								# and next() will invoke other functions that try to set headers
-								# BUT the false is never actually sent to the client!
-								# next()						
-					@
+					
 				}
 
-			server.get '/test', (req, res, next) ->
-				console.log '/test '
-				docpad.action 'generate', {}, (err,result) ->
-				# docpad.action 'generate server', {collection:docpad.getCollection("database")}, (err,result) ->
-					if err
-						console.log "/test: error"
-						res.send 200, '/test: error'+err
-						# return next(err)
-					else
-						console.log "/test: success"
-						# console.log 'content-type %s', res.get 'Content-Type'
-						# 200 is success code
-						res.end 'regeneration succeeded'
-				# res.end
+			# generateReport = (err,result) ->
+			# 	if err
+			# 		console.log "/remove: regeneration failed"+err
+			# 		# res.send(500, err?.message or err)
+			# 		# res.body err
+			# 		return next(err) 
+			# 	else
+			# 		console.log "/remove: regeneration success"
+			# 		# console.log 'content-type %s', res.get 'Content-Type'
+			# 		# 200 is success code
+			# 		# res.end 'regeneration succeeded'
+					
+			# 		# res.end false
+			# 		# http://stackoverflow.com/a/7789131/1923190 suggests NOT calling next() as I have initiated the body
+			# 		# and next() will invoke other functions that try to set headers
+			# 		# BUT the false is never actually sent to the client!
+			# 		next()				
+
+			# server.get '/test', (req, res, next) ->
+			# 	console.log '/test '
+			# 	docpad.action 'generate', {}, (err,result) ->
+			# 	# docpad.action 'generate server', {collection:docpad.getCollection("database")}, (err,result) ->
+			# 		if err
+			# 			console.log "/test: error"
+			# 			res.send 200, '/test: error'+err
+			# 			# return next(err)
+			# 		else
+			# 			console.log "/test: success"
+			# 			# console.log 'content-type %s', res.get 'Content-Type'
+			# 			# 200 is success code
+			# 			res.end 'regeneration succeeded'
+			# 	# res.end
 
 			# chain??
-			# @
+			@
