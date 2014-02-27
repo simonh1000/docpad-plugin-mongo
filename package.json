@@ -1,7 +1,7 @@
 {
   "name": "docpad-plugin-mongo",
-  "version": "2.0.0",
-  "description": "DocPad plugin that adds the ability to render Something to Something Else",
+  "version": "2.0.5",
+  "description": "DocPad plugin that reads from mongodb and returns an object to be included in rendering",
   "homepage": "https://github.com/simonh1000/docpad-plugin-mongo",
   "keywords": [
     "docpad",
@@ -10,17 +10,17 @@
   ],
   "author": "Copyright holders name <copyright holder's email> (copyright holder's website url)",
   "maintainers": [
-    "Simon Hampton <your email> (your github url)"
+    "Simon Hampton <your email> (https://github.com/simonh1000)"
   ],
   "contributors": [
-    "Your name <your email> (your github url)"
+    ""
   ],
   "bugs": {
-    "url": "https://github.com/yourgithubusername/docpad-plugin-yourpluginname/issues"
+    "url": "https://github.com/simonh1000/docpad-plugin-mongo/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourgithubusername/docpad-plugin-yourpluginname.git"
+    "url": "https://github.com/simonh1000/docpad-plugin-mongo.git"
   },
   "engines": {
     "node": ">=0.10"
