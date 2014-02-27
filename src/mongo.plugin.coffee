@@ -12,12 +12,13 @@ Dbdata = mongoose.model 'gigs', gigSchema
 # Export Plugin
 module.exports = (BasePlugin) ->
 	class mongoPlugin extends BasePlugin
+		conf = docpad.config.plugins.mongo
 		name: 'mongo'
 
 		config:
 			uristring: (() -> process.env.MONGOLAB_URI || 
 				process.env.MONGOHQ_URL || 
-				'mongodb://localhost/app22118608')()
+				conf.hostname+conf.database)()
 
 		# extendCollections: (next) ->
 		# 	test = docpad.getCollections("html").findAll({isPage:true}, {menuOrder:1})
@@ -25,22 +26,26 @@ module.exports = (BasePlugin) ->
 		# Reading data
 		# ============
 
-		readData: (obj, queries, next) ->
+		readData: (obj, queries, cb) ->
 			queryCount = 0
 			totalQueries = Object.keys(queries).length
+			console.log "/readData start"
 
 			for index, query of queries
 				# could check for ownProperty here
 				# Listing 5.18 Javascript Ninja
 				((indexClosure) ->
 					Dbdata.find query.predicate, (err, data) ->
+						# data is an array, [model]
 						obj[indexClosure] = data
 				
 						if (++queryCount == totalQueries)
+							console.log "/readData closing database connection"
 							mongoose.connection.close()
-							return next(err) if err
-							return next()
+							return cb(err) if err
+							return cb()
 				)(index)
+			@
 
 		# opts={} sets opts to default empty object if otherwise null
 		extendTemplateData: (opts,next) ->
@@ -65,9 +70,8 @@ module.exports = (BasePlugin) ->
 		replaceDbData: (opts) ->
 			config = @getConfig()
 			{data, cb} = opts
+			docpad = @docpad
 
-			# Dbdata = mongoose.model gigSchema
-			
 			mongoose.connect(config.uristring)			
 			db = mongoose.connection
 			
@@ -75,15 +79,18 @@ module.exports = (BasePlugin) ->
 				docpad.error(err)
 
 			db.once 'open', ->
-				console.log "Adding to database"
+				console.log "/replaceDbData Adding to database"
 				
 				# http://metaduck.com/01-asynchronous-iteration-patterns.html
 				# http://stackoverflow.com/a/7855281/1923190
 				inserted = 0
 				report = ""
+				docpad.pluginsTemplateData['futuregigs'] = []
 
 				for index, item of data
 					toUpdate = new Dbdata item
+					# **** YUK hardcoded object name!!!!!! *******
+					docpad.pluginsTemplateData['futuregigs'].push(toUpdate)
 					upsertData = toUpdate.toObject()
 					delete upsertData._id
 					# we need _id to be null so that a new one is created
@@ -95,11 +102,10 @@ module.exports = (BasePlugin) ->
 							report += inserted+" failed"+err+"\n"
 
 						if (++inserted == Object.keys(data).length)
-							console.log("All done, closing connection"+report)
-							mongoose.connection.close()
+							console.log("/replaceDbData finished")
+							# mongoose.connection.close()
 							cb report
-							return
-				@
+			@
 
 		removeData: (opts) ->
 			config = @getConfig()
@@ -116,10 +122,9 @@ module.exports = (BasePlugin) ->
 				# console.log "Removing from database"
 				toRemove = new Dbdata data
 				toRemove.remove (err, product) ->
-					mongoose.connection.close()
-					# response = if err then err else false
+					# mongoose.connection.close()
+					console.log err if err
 					cb err
-					return next()
 			@
 
 		serverExtend: (opts) ->
@@ -129,56 +134,36 @@ module.exports = (BasePlugin) ->
 			config = @getConfig()
 
 			server.post '/newdata', (req, res) ->
-				console.log 'Received data entries'
-				plugin.replaceDbData { data:req.body, cb : (err) ->
-					# res.setHeader 'Content-Type', 'text/plain'
-					if (err)
-						console.log ("Database update error="+err)
-						res.end err
-					else 
-						console.log "Database update success"
-						docpad.action 'generate', reset: true, (err,result) ->
-						# docpad.action 'generate', {collection:docpad.getCollection("database")}, (err,result) ->
-							if err
-								console.log "/update regeneration failed"
-								res.send(500, err?.message or err)
-								next(err) 
-							else
-								console.log "/update regeneration success"
-								res.send(200, '/update success')
-								# next()
-				}
+				console.log '/newdata: start '
+				plugin.replaceDbData { data:req.body, cb : plugin.regenerate }
 
 			server.get '/remove', (req, res) ->
-				console.log 'Processing removal of '+req.query._id
-				plugin.removeData { data:req.query, cb : (err) ->
-					# res.setHeader 'Content-Type', 'text/plain'
-					if (err)
-						console.log ("removal error="+err)
-						res.send(500, err?.message or err)
-						# next(err)
-					else 
-						console.log "/remove: Database action succeeded"
-						plugin.readData docpad.pluginsTemplateData, config.queries, () ->
-							docpad.action 'generate', reset: true, (err,result) ->
-								console.log "error" if err
-							# return next(null, result)	
-						# docpad.action 'generate', {collection:docpad.getCollection("database")}, (err,result) ->
-					
-				}
+				console.log '/remove start: removing '+req.query._id
+				plugin.removeData { data:req.query, cb : plugin.regenerate }
+			#chain
+			@
 
-			# generateReport = (err,result) ->
-			# 	if err
-			# 		console.log "/remove: regeneration failed"+err
-			# 		# res.send(500, err?.message or err)
-			# 		# res.body err
-			# 		return next(err) 
-			# 	else
-			# 		console.log "/remove: regeneration success"
-			# 		# console.log 'content-type %s', res.get 'Content-Type'
-			# 		# 200 is success code
-			# 		# res.end 'regeneration succeeded'
-					
+		regenerate: (err) ->
+			docpad = @docpad
+			# res.setHeader 'Content-Type', 'text/plain'
+			if (err)
+				console.log ("/regenerate passed error="+err)
+				res.send(500, err?.message or err)
+				# next(err)
+			else 
+				console.log "/regenerate: Database action succeeded"
+				# plugin.readData docpad.pluginsTemplateData, config.queries, () ->
+				mongoose.connection.close()
+				genOpts:
+					collection:docpad.getCollection("Database")
+					# reset: true  # default
+				# looks like reset: true is the default
+				docpad.action 'generate', genOpts, (err,result) ->
+				# docpad.action 'generate', {collection:docpad.getCollection("database")}, (err,result) ->
+					return console.log "/regenerate error" if err
+					return console.log "/regenerate completed"
+			@
+
 			# 		# res.end false
 			# 		# http://stackoverflow.com/a/7789131/1923190 suggests NOT calling next() as I have initiated the body
 			# 		# and next() will invoke other functions that try to set headers
@@ -199,6 +184,3 @@ module.exports = (BasePlugin) ->
 			# 			# 200 is success code
 			# 			res.end 'regeneration succeeded'
 			# 	# res.end
-
-			# chain??
-			@
