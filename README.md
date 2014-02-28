@@ -22,11 +22,13 @@ Add to `docpad.coffee`
 					date: { type: Date, default: Date.now },
 					location: String,
 					link: String		
-				queries:
-					futuregigs:
-						predicate: {"date": {$gte: new Date()}}
-					pastgigs:
-						predicate: {"date": {$lt: new Date()}}
+				queryArr: [
+					name: "futuregigs"
+					predicate: {"date": {$gte: new Date()}}
+				,
+					name: "pastgigs"
+					predicate: {"date": {$lt: new Date()}}
+				]
 	}
 
 	# Export the DocPad Configuration

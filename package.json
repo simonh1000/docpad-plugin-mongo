@@ -30,7 +30,8 @@
   },
   "main": "./src/mongo.plugin.coffee",
   "dependencies": {
-    "mongoose": "~3.8.7"
+    "mongoose": "~3.8.7",
+    "async": "*"
   },
   "devDependencies": {
     "coffee-script": "~1.6.2",
