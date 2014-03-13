@@ -34,15 +34,15 @@ Add to `docpad.coffee`
 	# Export the DocPad Configuration
 	module.exports = docpadConfig
 
-Example of usage in eco file
+Example of usage in eco file, note the extra hidden input element that tells the server which predicate to use to rewrite all the content of (it will delete everything matching the predicate first and then insert the data sent from the client).
 
 	<% zero_pad = (x) -> if x < 10 then '0'+x else ''+x %>
+	<input type='hidden' id='queryName' value='futuregigs'>
 	<% if @gigs.length: %>
 		<% for gig in @futuregigs: %>
 			<% mString = gig.date.getFullYear() %>
 			<% mString += "-"+ zero_pad (gig.date.getMonth() + 1) %>
 			<% mString += "-"+ zero_pad gig.date.getDate() %>
-			<input type='hidden' id='queryName' value='futuregigs'>
 			<div class="gig-entry">
 				<input type="hidden" name="_id" value="<%= gig._id %>">
 				<input type="date" name="date" width="20" value="<%- mString %>">
